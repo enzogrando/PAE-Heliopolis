@@ -1,0 +1,9 @@
+{
+  "fonte": "SIH/SUS (AIH Reduzida, RD), DATASUS, arquivos de São Paulo (RDSP)",
+  "obtido_via": "PySUS 2.11.7 (espelho Parquet) e FTP ftp.datasus.gov.br (8 meses ausentes do espelho)",
+  "periodo": "2021-01-01 a 2025-12-31 (data da internação)",
+  "arquivos_usados": "competências 2021-01 a 2026-08; os meses de 2026 completam as internações de 2025, que chegam com atraso",
+  "filtros": "residentes na cidade de São Paulo (MUNIC_RES = 355030); somente AIH normal (IDENT = 1); CID principal I00-I99 (aparelho circulatório) e J00-J99 (aparelho respiratório)",
+  "gerado_em_utc": "2026-10-23T02:39:44+00:00",
+  "linhas": 14608
+}

@@ -1,0 +1,10 @@
+﻿# Ambiente virtual e cache de download (regeneráveis)
+.venv/
+cache/
+# Dados individuais de internação: nunca versionar
+saidas/02_amostra_200_linhas.csv
+# Regeneráveis pelos scripts 04 e 06 (mais de 15 MB) e registros de execução
+saidas/reduzidos/
+saidas/06_era5_2021_2025.json
+saidas/*.txt
+saidas/02_colunas.csv

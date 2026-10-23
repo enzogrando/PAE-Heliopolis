@@ -40,9 +40,10 @@ NAO_FUNCIONAIS = [
     ("RNF06", "Clareza", "Usar uma página, unidades e ausência explícitas; distinguir contexto regional de medições locais e de impactos na saúde."),
 ]
 FUTURO = (
-    "Etapa futura do estudo: relacionar as condições regionais estimadas por ERA5 a dados "
-    "de saúde e qualidade de vida compatíveis no tempo e no território. "
-    "Esses desfechos ainda não estão integrados à aplicação."
+    "Etapa atual do estudo: relacionar as condições regionais estimadas por ERA5 a dados "
+    "de saúde. Já está integrada uma tabela de internações do SIH/SUS da cidade de São Paulo "
+    "inteira (não do bairro). Dados de qualidade de vida e do próprio território de Heliópolis "
+    "ainda não estão integrados à aplicação."
 )
 LIMITE = (
     "Os requisitos acima descrevem o comportamento atual, não uma certificação de qualidade. "
