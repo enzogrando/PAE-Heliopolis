@@ -9,9 +9,9 @@ Como ler este arquivo (para quem não programa):
     Ele não faz as contas estatísticas: pede os resultados prontos a analise.py e os
     dados a dados.py, e só os desenha na tela. A ordem em que a página aparece é a
     ordem das chamadas dentro da função main(), no final do arquivo:
-        1. título e avisos        2. arquitetura do sistema     3. fontes dos dados
-        4. período e limiar       5. cartões e gráficos         6. sequências de calor
-        7. calor e internações    8. conclusões     9. glossário e notas finais
+        1. título e avisos        2. fontes dos dados           3. período e limiar
+        4. cartões e gráficos     5. sequências de calor        6. calor e internações
+        7. conclusões             8. glossário e notas finais   9. arquitetura do sistema
     Os textos explicativos longos ficam em interpretacao.py.
 """
 from datetime import date
@@ -54,23 +54,71 @@ def carregar_online(inicio, fim):
     return buscar_open_meteo(inicio, fim)
 
 
-def barras_agrupadas(larga, eixo_x, colunas, cores, altura):
-    """Desenha barras lado a lado (uma cor por coluna) com os nomes do eixo X na horizontal.
+# Mesma cor para o mesmo grupo de doença em todos os gráficos de internações.
+CORES_GRUPOS = dict(zip(GRUPOS.values(), ["#d94832", "#287b9c"]))
+MESES = "['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']"
+TITULO_DIFERENCA = "Diferença em relação ao esperado (%)"
 
-    O st.bar_chart não deixa escolher o ângulo dos nomes, por isso este gráfico usa o Altair.
-    A tabela precisa ter uma coluna "Ordem", que define a ordem das categorias no eixo X.
+
+def grafico_linhas(serie, cores, altura, mensal):
+    """Linhas ao longo do tempo com os meses em português.
+
+    O st.line_chart escreve os meses em inglês (April, July...) e não deixa trocar, por isso
+    este gráfico usa o Altair. "serie" tem as datas no índice e uma coluna por linha;
+    "mensal" diz se cada ponto é um mês (rótulos "abr 2024") ou um dia (rótulos "15 abr").
     """
-    longa = larga.melt(id_vars=[eixo_x, "Ordem"], value_vars=colunas, var_name="Grupo", value_name="Diferença (%)")
-    grafico = alt.Chart(longa).mark_bar().encode(
-        x=alt.X(f"{eixo_x}:N", sort=list(larga.sort_values("Ordem")[eixo_x]), title=eixo_x,
-                axis=alt.Axis(labelAngle=0, labelLimit=0)),
-        xOffset=alt.XOffset("Grupo:N", sort=colunas),
-        y=alt.Y("Diferença (%):Q", title="Diferença em relação ao esperado (%)"),
-        color=alt.Color("Grupo:N", scale=alt.Scale(domain=colunas, range=[cores[g] for g in colunas]),
-                        legend=alt.Legend(title=None, orient="bottom", labelLimit=0)),
-        tooltip=[eixo_x, "Grupo", alt.Tooltip("Diferença (%):Q", format=".1f")],
+    rotulo = (f"{MESES}[month(datum.value)] + ' ' + year(datum.value)" if mensal else
+              f"timeFormat(datum.value, '%d') + ' ' + {MESES}[month(datum.value)]")
+    nomes = list(serie.columns)
+    longa = serie.rename_axis("Data").reset_index().melt("Data", var_name="Medida", value_name="Valor")
+    grafico = alt.Chart(longa).mark_line().encode(
+        x=alt.X("Data:T", title=None, axis=alt.Axis(labelExpr=rotulo, labelOverlap=True)),
+        y=alt.Y("Valor:Q", title="Temperatura (°C)", scale=alt.Scale(zero=False)),
+        color=alt.Color("Medida:N", scale=alt.Scale(domain=nomes, range=cores),
+                        legend=alt.Legend(title=None, orient="bottom") if len(nomes) > 1 else None),
+        tooltip=[alt.Tooltip("Data:T", format="%d/%m/%Y"), alt.Tooltip("Medida:N"),
+                 alt.Tooltip("Valor:Q", format=".1f", title="°C")],
     ).properties(height=altura)
     st.altair_chart(grafico, width="stretch")
+
+
+def dados_barras(tabela, coluna, eixo_x):
+    """Prepara as linhas conclusivas de uma tabela de comparação para o gráfico de barras.
+
+    Cada linha vira uma barra: a diferença em % e o intervalo de 95% (inferior e superior).
+    "coluna" é a coluna da tabela que vai para o eixo X (a idade ou a faixa de temperatura).
+    """
+    t = tabela[tabela.conclusivo]
+    return pd.DataFrame({
+        eixo_x: t[coluna].to_numpy(), "Grupo": t.grupo.to_numpy(), "Diferença (%)": t.variacao_pct.to_numpy(),
+        "Inferior": t.ic_inf_pct.to_numpy(), "Superior": t.ic_sup_pct.to_numpy(),
+        "Intervalo de 95% (%)": [f"{numero(i)} a {numero(s)}" for i, s in zip(t.ic_inf_pct, t.ic_sup_pct)]})
+
+
+def barras_agrupadas(dados, eixo_x, categorias, altura):
+    """Barras lado a lado (uma cor por grupo de doença) com o intervalo de 95% em cada barra.
+
+    O st.bar_chart não deixa escolher o ângulo dos nomes nem desenhar barras de erro, por isso este
+    gráfico usa o Altair. "dados" vem de dados_barras e "categorias" é a ordem dos nomes no eixo X.
+    A linha com marcas em cada barra é o intervalo de 95%: se ela cruza o zero, não há diferença clara.
+    """
+    grupos = list(CORES_GRUPOS)
+    base = alt.Chart(dados).encode(
+        x=alt.X(f"{eixo_x}:N", sort=categorias, title=eixo_x, axis=alt.Axis(labelAngle=0, labelLimit=0)),
+        xOffset=alt.XOffset("Grupo:N", sort=grupos))
+    barras = base.mark_bar().encode(
+        y=alt.Y("Diferença (%):Q", title=TITULO_DIFERENCA),
+        color=alt.Color("Grupo:N", scale=alt.Scale(domain=grupos, range=list(CORES_GRUPOS.values())),
+                        legend=alt.Legend(title=None, orient="bottom", labelLimit=0)),
+        tooltip=[eixo_x, "Grupo", alt.Tooltip("Diferença (%):Q", format=".1f"), "Intervalo de 95% (%)"])
+    cinza = "#9aa0a6"
+    linha = base.mark_rule(color=cinza, strokeWidth=3).encode(
+        y=alt.Y("Inferior:Q", title=TITULO_DIFERENCA), y2="Superior:Q")
+    marca_inferior = base.mark_tick(color=cinza, size=14, thickness=3).encode(y=alt.Y("Inferior:Q", title=TITULO_DIFERENCA))
+    marca_superior = base.mark_tick(color=cinza, size=14, thickness=3).encode(y=alt.Y("Superior:Q", title=TITULO_DIFERENCA))
+    st.altair_chart(alt.layer(barras, linha, marca_inferior, marca_superior).properties(height=altura), width="stretch")
+    st.caption("As barras mostram a diferença em relação ao esperado. A linha em cada barra é o intervalo de 95%: "
+               "se ela cruza o zero, não dá para afirmar que há diferença.")
 
 
 def iniciar_base():
@@ -179,9 +227,9 @@ def mostrar_exposicao(diario, noites, episodios, limiar):
         longo = len(diario) > 370
         if longo:
             serie = serie.resample("MS").mean()
-        st.line_chart(serie.rename(columns={"temp_max_c": "Máxima (°C)",
+        grafico_linhas(serie.rename(columns={"temp_max_c": "Máxima (°C)",
             "temp_media_c": "Média (°C)", "temp_min_c": "Mínima (°C)"}),
-            color=["#d94832", "#d99b25", "#287b9c"], height=240)
+            ["#d94832", "#d99b25", "#287b9c"], 240, mensal=longo)
         st.caption(("Médias mensais das máximas, médias e mínimas diárias. " if longo else
                     "Máximas, médias e mínimas dos registros horários de cada dia. ") +
                    "Permite explorar a intensidade e a sazonalidade do calor regional.")
@@ -216,12 +264,13 @@ def mostrar_rotina(perfil, diario, noites, r, dias_correlacao):
         st.markdown("**Temperatura à noite**")
         serie = noites[["temp_noturna_media_c"]].rename(columns={"temp_noturna_media_c": "Temperatura noturna (°C)"})
         # Com muitas noites, o gráfico mostra a média de cada mês para ficar legível.
-        if len(serie) > 370:
+        mensal = len(serie) > 370
+        if mensal:
             serie = serie.resample("MS").mean()
             legenda = "Médias mensais das noites válidas"
         else:
             legenda = "Médias das noites válidas"
-        st.line_chart(serie, color="#287b9c", height=220)
+        grafico_linhas(serie, ["#287b9c"], 220, mensal=mensal)
         st.caption(legenda + " · 22h–05h59. Caracteriza o período de descanso, sem medir a qualidade do sono.")
         st.markdown("**O que isso significa:** " + leitura_noite(noites))
     # Gráfico 3: cada ponto é um dia, com sua temperatura média e sua umidade média.
@@ -235,7 +284,12 @@ def mostrar_rotina(perfil, diario, noites, r, dias_correlacao):
         if pontos.empty:
             st.info("Não há dias com cobertura suficiente de temperatura e umidade neste recorte.")
         else:
-            st.scatter_chart(pontos, x="Temperatura (°C)", y="Umidade (%)", color="#287b9c", height=220)
+            # Os eixos começam perto dos valores reais (não em zero), para os pontos não ficarem espremidos.
+            st.altair_chart(alt.Chart(pontos).mark_circle(size=45, opacity=0.6, color="#287b9c").encode(
+                x=alt.X("Temperatura (°C):Q", scale=alt.Scale(zero=False)),
+                y=alt.Y("Umidade (%):Q", scale=alt.Scale(zero=False)),
+                tooltip=[alt.Tooltip("Temperatura (°C):Q", format=".1f"), alt.Tooltip("Umidade (%):Q", format=".0f")],
+            ).properties(height=220), width="stretch")
             st.caption("Cada ponto representa as médias de um dia. Explora a relação entre calor e umidade; não é sensação térmica nem índice de estresse térmico.")
             st.markdown("**O que isso significa:** " + leitura_umidade(r, dias_correlacao))
 
@@ -286,13 +340,8 @@ def mostrar_saude(diario, limiar):
         if conclusivos.empty:
             st.info("Dias quentes insuficientes neste recorte para comparar.")
         else:
-            # Uma linha por faixa de idade e uma coluna (cor) por grupo de doença, como no gráfico das faixas de temperatura.
-            larga = conclusivos.pivot(index="idade", columns="grupo", values="variacao_pct")
-            larga["Ordem"] = [list(RECORTES).index(i) for i in larga.index]
-            larga = larga.reset_index().rename(columns={"idade": "Idade"})
-            cores = dict(zip(GRUPOS.values(), ["#d94832", "#287b9c"]))
-            colunas = [g for g in cores if g in larga.columns]
-            barras_agrupadas(larga, "Idade", colunas, cores, altura=420)
+            # Um grupo de barras por faixa de idade, uma cor por doença, com o intervalo de 95% em cada barra.
+            barras_agrupadas(dados_barras(conclusivos, "idade", "Idade"), "Idade", list(RECORTES), altura=420)
         st.markdown("Barras perto de zero indicam que os dias quentes tiveram um número de internações "
                     "parecido com o esperado para o mesmo mês, ano e dia da semana.")
         st.markdown("**O que isso significa:** " + leitura_saude(tabela, limiar))
@@ -304,12 +353,10 @@ def mostrar_saude(diario, limiar):
         if validas.empty:
             st.info("Dias insuficientes neste recorte para comparar as faixas de temperatura.")
         else:
-            # Uma linha por faixa e uma coluna por grupo de doença; "Ordem" mantém as faixas da mais fria à mais quente.
-            larga = faixas.pivot(index="faixa", columns="grupo", values="variacao_pct")
-            larga["Ordem"] = faixas.drop_duplicates("faixa").set_index("faixa").ordem
-            larga = larga.reset_index().rename(columns={"faixa": "Temperatura máxima do dia"})
-            cores = dict(zip(GRUPOS.values(), ["#d99b25", "#7a5cc4"]))
-            barras_agrupadas(larga, "Temperatura máxima do dia", [g for g in cores if g in larga.columns], cores, altura=420)
+            # Todas as faixas ficam no eixo, da mais fria à mais quente; as sem dias suficientes ficam sem barra.
+            ordem_faixas = list(faixas.drop_duplicates("faixa").sort_values("ordem").faixa)
+            barras_agrupadas(dados_barras(faixas, "faixa", "Temperatura máxima do dia"),
+                             "Temperatura máxima do dia", ordem_faixas, altura=420)
         st.markdown("Cada barra compara os dias daquela faixa de temperatura com o esperado para o mesmo "
                     "mês, ano e dia da semana. Faixas sem barra não têm dias suficientes para comparar.")
         st.markdown("**O que isso significa:** " + leitura_faixas(faixas))
@@ -357,7 +404,7 @@ def mostrar_glossario():
 
 
 def mostrar_arquitetura():
-    """Apresenta os requisitos e o fluxo técnico antes das análises do estudo."""
+    """Apresenta os requisitos e o fluxo técnico, no final da página, depois das análises do estudo."""
     st.subheader("Engenharia de software e arquitetura")
     st.write(INTRODUCAO)
     st.image(str(IMAGEM_ARQUITETURA), caption="Arquitetura implementada: API REST externa, ETL em memória e apresentação no Streamlit.")
@@ -382,7 +429,7 @@ def main():
     st.title("Heliópolis · Estresse térmico")
     st.write("Análise exploratória da exposição ao calor para o estudo da saúde e da qualidade de vida dos moradores.")
     st.caption("2021–2025 · Contexto ambiental regional de Heliópolis")
-    mostrar_arquitetura()
+    st.caption("Quer saber como o sistema foi construído? A seção \"Engenharia de software e arquitetura\" está no final da página.")
     st.info("Análise preliminar: as medições do Observatório De Olho na Quebrada não estão disponíveis para o projeto. "
             "Sem essa base e sem dados de saúde ou qualidade de vida do próprio bairro, os resultados descrevem "
             "o calor regional; não medem impactos nos moradores nem temperaturas dentro das moradias. "
@@ -420,6 +467,7 @@ def main():
                "noites parciais são excluídas. Máximas vêm de amostras horárias. Lacunas permanecem ausentes. "
                "ERA5 representa uma grade regional (~25 km), não medições dentro de Heliópolis.")
     st.caption("Fonte meteorológica: [Open-Meteo / Copernicus ERA5](https://open-meteo.com/en/docs/historical-weather-api).")
+    mostrar_arquitetura()
 
 
 if __name__ == "__main__":
