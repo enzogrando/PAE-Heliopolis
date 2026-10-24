@@ -17,13 +17,14 @@ Como ler este arquivo (para quem não programa):
 from datetime import date
 from pathlib import Path
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
 from analise import (correlacao_calor_umidade, episodios_quentes, indicadores_diarios,
                      indicadores_noturnos, perfil_horario, resumo_anual)
 from apoio import numero
-from saude import GRUPOS, carregar_internacoes, comparar_por_faixas, comparar_todos
+from saude import GRUPOS, RECORTES, carregar_internacoes, comparar_por_faixas, comparar_todos
 from arquitetura_projeto import (INTRODUCAO, REQUISICOES, ETL, FUNCIONAIS,
     NAO_FUNCIONAIS, FUTURO, LIMITE, IMAGEM_ARQUITETURA)
 from dados import (ErroDados, FIM_ESTUDO, FUSO, INICIO_ESTUDO,
@@ -51,6 +52,25 @@ def carregar_online(inicio, fim):
     consulta toda vez que o usuário mexe em um filtro da página.
     """
     return buscar_open_meteo(inicio, fim)
+
+
+def barras_agrupadas(larga, eixo_x, colunas, cores, altura):
+    """Desenha barras lado a lado (uma cor por coluna) com os nomes do eixo X na horizontal.
+
+    O st.bar_chart não deixa escolher o ângulo dos nomes, por isso este gráfico usa o Altair.
+    A tabela precisa ter uma coluna "Ordem", que define a ordem das categorias no eixo X.
+    """
+    longa = larga.melt(id_vars=[eixo_x, "Ordem"], value_vars=colunas, var_name="Grupo", value_name="Diferença (%)")
+    grafico = alt.Chart(longa).mark_bar().encode(
+        x=alt.X(f"{eixo_x}:N", sort=list(larga.sort_values("Ordem")[eixo_x]), title=eixo_x,
+                axis=alt.Axis(labelAngle=0, labelLimit=0)),
+        xOffset=alt.XOffset("Grupo:N", sort=colunas),
+        y=alt.Y("Diferença (%):Q", title="Diferença em relação ao esperado (%)"),
+        color=alt.Color("Grupo:N", scale=alt.Scale(domain=colunas, range=[cores[g] for g in colunas]),
+                        legend=alt.Legend(title=None, orient="bottom", labelLimit=0)),
+        tooltip=[eixo_x, "Grupo", alt.Tooltip("Diferença (%):Q", format=".1f")],
+    ).properties(height=altura)
+    st.altair_chart(grafico, width="stretch")
 
 
 def iniciar_base():
@@ -266,9 +286,13 @@ def mostrar_saude(diario, limiar):
         if conclusivos.empty:
             st.info("Dias quentes insuficientes neste recorte para comparar.")
         else:
-            visual = pd.Series(conclusivos.variacao_pct.to_numpy(), name="Diferença em relação ao esperado (%)",
-                               index=[f"{linha.grupo} · {linha.idade}" for linha in conclusivos.itertuples()])
-            st.bar_chart(visual, horizontal=True, color="#7a5cc4", height=240)
+            # Uma linha por faixa de idade e uma coluna (cor) por grupo de doença, como no gráfico das faixas de temperatura.
+            larga = conclusivos.pivot(index="idade", columns="grupo", values="variacao_pct")
+            larga["Ordem"] = [list(RECORTES).index(i) for i in larga.index]
+            larga = larga.reset_index().rename(columns={"idade": "Idade"})
+            cores = dict(zip(GRUPOS.values(), ["#d94832", "#287b9c"]))
+            colunas = [g for g in cores if g in larga.columns]
+            barras_agrupadas(larga, "Idade", colunas, cores, altura=420)
         st.markdown("Barras perto de zero indicam que os dias quentes tiveram um número de internações "
                     "parecido com o esperado para o mesmo mês, ano e dia da semana.")
         st.markdown("**O que isso significa:** " + leitura_saude(tabela, limiar))
@@ -284,9 +308,8 @@ def mostrar_saude(diario, limiar):
             larga = faixas.pivot(index="faixa", columns="grupo", values="variacao_pct")
             larga["Ordem"] = faixas.drop_duplicates("faixa").set_index("faixa").ordem
             larga = larga.reset_index().rename(columns={"faixa": "Temperatura máxima do dia"})
-            st.bar_chart(larga, x="Temperatura máxima do dia", y=[g for g in larga.columns if g in GRUPOS.values()],
-                         sort="Ordem", stack=False, color=["#c2547a", "#4a8fc2"], y_label="Diferença em relação ao esperado (%)",
-                         height=280)
+            cores = dict(zip(GRUPOS.values(), ["#d99b25", "#7a5cc4"]))
+            barras_agrupadas(larga, "Temperatura máxima do dia", [g for g in cores if g in larga.columns], cores, altura=420)
         st.markdown("Cada barra compara os dias daquela faixa de temperatura com o esperado para o mesmo "
                     "mês, ano e dia da semana. Faixas sem barra não têm dias suficientes para comparar.")
         st.markdown("**O que isso significa:** " + leitura_faixas(faixas))
