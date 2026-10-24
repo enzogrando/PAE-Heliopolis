@@ -70,6 +70,8 @@ LIMIAR_MUDA = (
     "- cartão \"Sequências de calor\"\n"
     "- gráfico \"Frequência de dias quentes\"\n"
     "- tabela de sequências de calor persistente\n"
+    "- gráfico \"Internações nos dias quentes, comparadas ao esperado\" e a tabela de números "
+    "dessa comparação\n"
     "- a frase de conclusão sobre dias quentes e sequências"
 )
 
@@ -79,6 +81,8 @@ LIMIAR_NAO_MUDA = (
     "- \"Calor por horário\"\n"
     "- \"Temperatura à noite\"\n"
     "- \"Calor e umidade\"\n"
+    "- gráfico \"Internações por faixa de temperatura máxima, comparadas ao esperado\" "
+    "(usa todas as faixas de temperatura, não só os dias acima do limiar)\n"
     "- cartões de maior temperatura e de temperatura média noturna"
 )
 
@@ -186,7 +190,14 @@ SAUDE_LIMITES = (
     "- A data usada é a da **internação**, e não a do início dos sintomas.\n"
     "- É uma **associação**, e não uma relação de causa e efeito.\n"
     "- Ao mudar o limiar, você testa várias definições de dia quente. Um resultado que aparece "
-    "só em um valor do limiar pode ser acaso."
+    "só em um valor do limiar pode ser acaso.\n"
+    "- O intervalo de 95% sorteia os dias quentes como se um não tivesse relação com o outro, mas "
+    "dias quentes costumam vir em sequência. Por isso o intervalo pode ser mais estreito do que "
+    "deveria.\n"
+    "- O valor esperado vem de poucos dias de referência (no mínimo 2 por mês e dia da semana) e é "
+    "tratado como um número exato. Essa incerteza não entra no intervalo.\n"
+    "- Como são vários grupos de doença, idades, faixas de temperatura e limiares, alguns "
+    "intervalos podem deixar de incluir o zero apenas por acaso."
 )
 
 SAUDE_FONTE_DETALHE = (
