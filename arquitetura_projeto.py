@@ -10,26 +10,31 @@ INTRODUCAO = (
     "a coleta e as análises executam no mesmo processo, com responsabilidades separadas "
     "em arquivos. O navegador apresenta o painel e envia as interações; os módulos Python "
     "processam os dados com Pandas. A API REST consumida é externa, do Open-Meteo. "
-    "O projeto não expõe uma API REST própria nem utiliza banco de dados."
+    "Os dados de saúde vêm de uma tabela local de internações do SIH/SUS, preparada fora do "
+    "dashboard. O projeto não expõe uma API REST própria nem utiliza banco de dados."
 )
 REQUISICOES = (
     "Na carga inicial, o sistema prioriza o JSON salvo. Se ele não existir, o servidor "
     "Python envia uma requisição HTTPS GET ao endpoint /v1/archive do Open-Meteo, "
     "com coordenadas, período, modelo ERA5 e variáveis na URL; a resposta retorna em JSON. "
-    "O Open-Meteo é a única fonte meteorológica consumida pela aplicação."
+    "O Open-Meteo é a única fonte meteorológica consumida pela aplicação. O dashboard não "
+    "consulta o DATASUS: a tabela de internações é lida do disco."
 )
 ETL = (
     "O fluxo segue um ETL em memória: extrair o JSON local ou recebido da API; transformar campos, "
     "unidades, datas, cobertura e duplicatas; carregar DataFrames tratados para os cálculos "
     "e a visualização. A carga não ocorre em um data warehouse. Os scripts auxiliares "
-    "geram arquivos persistentes quando executados; o dashboard reutiliza sessão e cache."
+    "geram arquivos persistentes quando executados; o dashboard reutiliza sessão e cache. "
+    "As internações seguem um caminho separado: scripts em exploracao_saude/ baixam o SIH/SUS, "
+    "reduzem os arquivos a contagens e exportam dados_saude/internacoes_diarias_sp.csv."
 )
 FUNCIONAIS = [
     ("RF01", "Obter dados", "Ler o JSON ERA5 local ou consultar o Open-Meteo quando ele não existir."),
     ("RF02", "Tratar a série", "Validar campos e unidades, organizar a grade horária, remover duplicatas e preservar lacunas."),
     ("RF03", "Explorar o período", "Filtrar 2021–2025 por ano e ajustar o limiar analítico entre 25 e 40 °C."),
     ("RF04", "Analisar o calor", "Calcular intensidade, frequência, perfil horário, noites, umidade e sequências de calor."),
-    ("RF05", "Apresentar resultados", "Exibir gráficos, cartões, critérios e limites; gerar relatório e auditorias pelo terminal."),
+    ("RF05", "Comparar calor e internações", "Comparar as internações por doenças do coração e respiratórias nos dias quentes e em cada faixa de temperatura com o esperado, com intervalo de 95%."),
+    ("RF06", "Apresentar resultados", "Exibir gráficos, cartões, critérios e limites; gerar relatório e auditorias pelo terminal."),
 ]
 NAO_FUNCIONAIS = [
     ("RNF01", "Qualidade", "Exigir 90% de cobertura diária e noturna de temperatura; não inventar nem interpolar lacunas."),
