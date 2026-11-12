@@ -76,7 +76,7 @@ flowchart TD
   - Lucas Silva — RA: 23.00140-2
   - Pedro Kuba Bloise — RA: 23.00161-5
   - Vinicius Takashi Nakatsui — RA: 23.01037-0
-- **Vídeo de Demonstração e Apresentação:** [Link do vídeo: a ser adicionado após a gravação](#)
+- **Vídeo de Demonstração e Apresentação:** [Link youtube]([#](https://www.youtube.com/watch?v=eVGjO7yHNss))
 - **Repositório GitHub:** [https://github.com/enzogrando/PAE-Heliopolis](https://github.com/enzogrando/PAE-Heliopolis)
 - **Pacote para Windows (Releases):** [Baixar heliopolis_app.zip (versão mais recente)](https://github.com/enzogrando/PAE-Heliopolis/releases/latest/download/heliopolis_app.zip) · [ver todas as versões](https://github.com/enzogrando/PAE-Heliopolis/releases)
 
